@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Historial de Movimientos - Bazar </title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-dark mb-0">Historial de Movimientos y Auditoría de Bajas</h2>
+        <a href="{{ url_for('index') }}" class="btn btn-primary">Volver al Inventario</a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white">Registro Cronológico de Entradas, Ventas y Mermas</div>
+        <div class="card-body p-0">
+            <table class="table table-striped table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID Mov.</th>
+                        <th>Fecha y Hora</th>
+                        <th>Artículo</th>
+                        <th>Categoría</th>
+                        <th>Tipo de Operación</th>
+                        <th>Motivo / Detalle</th>
+                        <th>Cantidad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in movimientos %}
+                    <tr>
+                        <td>#{{ m.id }}</td>
+                        <td>{{ m.fecha }}</td>
+                        <td class="fw-bold">{{ m.producto_nombre }}</td>
+                        <td>{{ m.categoria }}</td>
+                        <td>
+                            {% if m.tipo == 'INGRESO' %}
+                                <span class="badge bg-success">INGRESO</span>
+                            {% elif m.tipo == 'VENTA' %}
+                                <span class="badge bg-warning text-dark">VENTA</span>
+                            {% else %}
+                                <span class="badge bg-danger">BAJA / MERMA</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ m.motivo }}</td>
+                        <td class="fw-bold">{{ m.cantidad }} u.</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-3 text-muted">Aún no se registraron movimientos.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -2,20 +2,19 @@ import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, flash
 
 app = Flask(__name__)
-app.secret_key = "clave_secreta_bazar"  # Necesaria para mostrar mensajes en pantalla
+app.secret_key = "clave_secreta_bazar"
 
 DB_NAME = "bazar.db"
 
 def get_db():
-    """Conecta a SQLite y permite acceder a las columnas por nombre."""
+    """CONECTA A SQLITE"""
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    """Crea las dos tablas del sistema si no existen."""
+    """CREA LAS DOS TABLAS SI NO EXISTEN"""
     with get_db() as conn:
-        # Tabla 1: Catálogo de artículos (Sin precios, foco en stock y ubicación)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS productos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,13 +26,12 @@ def init_db():
                 activo INTEGER NOT NULL DEFAULT 1
             )
         """)
-        # Tabla 2: Historial de entradas, ventas y bajas por rotura/falla
         conn.execute("""
             CREATE TABLE IF NOT EXISTS movimientos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 producto_id INTEGER NOT NULL,
-                tipo TEXT NOT NULL,        -- 'INGRESO', 'VENTA', 'BAJA'
-                motivo TEXT NOT NULL,      -- 'Re-stock', 'Venta mostrador', 'Rotura en local', 'Falla de fábrica'
+                tipo TEXT NOT NULL,
+                motivo TEXT NOT NULL,
                 cantidad INTEGER NOT NULL,
                 fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (producto_id) REFERENCES productos (id)
@@ -41,23 +39,52 @@ def init_db():
         """)
         conn.commit()
 
-# F02: Listado general de existencias (MD)
+# FUNCIONALIDADES F02, F07 Y F10 (MAURO Y GONZALO)
 @app.route("/")
 def index():
-    with get_db() as conn:
-        productos = conn.execute(
-            "SELECT * FROM productos WHERE activo = 1 ORDER BY nombre"
-        ).fetchall()
-    return render_template("index.html", productos=productos)
+    busqueda = request.args.get("q", "").strip()
+    categoria_filtro = request.args.get("categoria", "").strip()
 
-# F01: Alta de artículo en catálogo (BB)
+    query = "SELECT * FROM productos WHERE activo = 1"
+    params = []
+
+    if busqueda:
+        query += " AND nombre LIKE ?"
+        params.append(f"%{busqueda}%")
+    
+    if categoria_filtro:
+        query += " AND categoria = ?"
+        params.append(categoria_filtro)
+
+    query += " ORDER BY nombre"
+
+    with get_db() as conn:
+        productos = conn.execute(query, params).fetchall()
+
+    return render_template(
+        "index.html",
+        productos=productos,
+        busqueda=busqueda,
+        categoria_filtro=categoria_filtro
+    )
+
+# FUNCIONALIDADES F01 Y F05 (BRUNO)
 @app.route("/agregar", methods=["POST"])
 def agregar_producto():
     nombre = request.form.get("nombre", "").strip()
-    categoria = request.form.get("categoria", "")
-    ubicacion = request.form.get("ubicacion", "")
-    stock_actual = int(request.form.get("stock_actual", 0))
-    stock_minimo = int(request.form.get("stock_minimo", 0))
+    categoria = request.form.get("categoria", "").strip()
+    ubicacion = request.form.get("ubicacion", "").strip()
+    
+    try:
+        stock_actual = int(request.form.get("stock_actual", 0))
+        stock_minimo = int(request.form.get("stock_minimo", 0))
+    except ValueError:
+        flash("Error (F05): Las cantidades de stock deben ser números enteros válidos.", "danger")
+        return redirect(url_for("index"))
+
+    if not nombre or stock_actual < 0 or stock_minimo < 0:
+        flash("Error (F05): El nombre es obligatorio y no se permite ingresar stock inicial ni mínimo negativo.", "danger")
+        return redirect(url_for("index"))
 
     with get_db() as conn:
         cursor = conn.execute(
@@ -67,7 +94,6 @@ def agregar_producto():
         )
         producto_id = cursor.lastrowid
         
-        # Si ingresa con stock inicial mayor a 0, dejamos asentado el primer movimiento
         if stock_actual > 0:
             conn.execute(
                 "INSERT INTO movimientos (producto_id, tipo, motivo, cantidad) VALUES (?, 'INGRESO', 'Stock inicial', ?)",
@@ -75,12 +101,21 @@ def agregar_producto():
             )
         conn.commit()
 
+    flash(f"Artículo '{nombre}' registrado correctamente.", "success")
     return redirect(url_for("index"))
 
-# F03: Registro de ingreso de mercadería / Re-stock (GB)
+# FUNCIONALIDADES F03 Y F05 (GONZALO Y BRUNO)
 @app.route("/restock/<int:id>", methods=["POST"])
 def re_stock(id):
-    cantidad = int(request.form.get("cantidad", 0))
+    try:
+        cantidad = int(request.form.get("cantidad", 0))
+    except ValueError:
+        cantidad = 0
+
+    if cantidad <= 0:
+        flash("Error (F05): La cantidad a ingresar por re-stock debe ser mayor a cero.", "danger")
+        return redirect(url_for("index"))
+
     with get_db() as conn:
         conn.execute(
             "UPDATE productos SET stock_actual = stock_actual + ? WHERE id = ?",
@@ -91,14 +126,28 @@ def re_stock(id):
             (id, cantidad)
         )
         conn.commit()
+
+    flash("Ingreso de mercadería registrado correctamente.", "success")
     return redirect(url_for("index"))
 
-# F04: Registro de salida por venta en mostrador (GB)
+# FUNCIONALIDADES F04 Y F05 (GONZALO Y BRUNO)
 @app.route("/venta/<int:id>", methods=["POST"])
 def registrar_venta(id):
-    cantidad = int(request.form.get("cantidad", 0))
+    try:
+        cantidad = int(request.form.get("cantidad", 0))
+    except ValueError:
+        cantidad = 0
+
+    if cantidad <= 0:
+        flash("Error (F05): La cantidad de salida por venta debe ser mayor a cero.", "danger")
+        return redirect(url_for("index"))
+
     with get_db() as conn:
-        # En Etapa 1 aún no validamos en el backend si el stock queda negativo (F05 pendiente)
+        producto = conn.execute("SELECT nombre, stock_actual FROM productos WHERE id = ?", (id,)).fetchone()
+        if not producto or producto["stock_actual"] < cantidad:
+            flash(f"Error (F05): Stock insuficiente para '{producto['nombre']}'. Disponible: {producto['stock_actual']} u.", "danger")
+            return redirect(url_for("index"))
+
         conn.execute(
             "UPDATE productos SET stock_actual = stock_actual - ? WHERE id = ?",
             (cantidad, id)
@@ -108,14 +157,30 @@ def registrar_venta(id):
             (id, cantidad)
         )
         conn.commit()
+
+    flash("Salida por venta registrada.", "success")
     return redirect(url_for("index"))
 
-# F06: Baja de mercadería por rotura o falla de fábrica (IR)
+# FUNCIONALIDADES F06 Y F06 (IGNACIO Y BRUNO)
 @app.route("/baja/<int:id>", methods=["POST"])
 def registrar_baja(id):
-    cantidad = int(request.form.get("cantidad", 0))
-    motivo = request.form.get("motivo", "Rotura en local") # 'Rotura en local' o 'Falla de fábrica'
+    try:
+        cantidad = int(request.form.get("cantidad", 0))
+    except ValueError:
+        cantidad = 0
+
+    motivo = request.form.get("motivo", "Rotura en local")
+
+    if cantidad <= 0:
+        flash("Error (F05): La cantidad a dar de baja debe ser mayor a cero.", "danger")
+        return redirect(url_for("index"))
+
     with get_db() as conn:
+        producto = conn.execute("SELECT nombre, stock_actual FROM productos WHERE id = ?", (id,)).fetchone()
+        if not producto or producto["stock_actual"] < cantidad:
+            flash(f"Error (F05): No se puede dar de baja más unidades de las existentes ({producto['stock_actual']} u.).", "danger")
+            return redirect(url_for("index"))
+
         conn.execute(
             "UPDATE productos SET stock_actual = stock_actual - ? WHERE id = ?",
             (cantidad, id)
@@ -125,7 +190,58 @@ def registrar_baja(id):
             (id, motivo, cantidad)
         )
         conn.commit()
+
+    flash(f"Baja registrada ({motivo}).", "warning")
     return redirect(url_for("index"))
+
+# FUNCIONALIDAD F08 (MAURO)
+@app.route("/editar/<int:id>", methods=["POST"])
+def editar_producto(id):
+    nombre = request.form.get("nombre", "").strip()
+    categoria = request.form.get("categoria", "").strip()
+    ubicacion = request.form.get("ubicacion", "").strip()
+
+    try:
+        stock_minimo = int(request.form.get("stock_minimo", 0))
+    except ValueError:
+        stock_minimo = -1
+
+    if not nombre or stock_minimo < 0:
+        flash("Error (F05/F08): Datos de edición inválidos o stock mínimo negativo.", "danger")
+        return redirect(url_for("index"))
+
+    with get_db() as conn:
+        conn.execute(
+            """UPDATE productos 
+               SET nombre = ?, categoria = ?, ubicacion = ?, stock_minimo = ?
+               WHERE id = ?""",
+            (nombre, categoria, ubicacion, stock_minimo, id)
+        )
+        conn.commit()
+
+    flash(f"Datos del artículo '{nombre}' actualizados sin alterar sus existencias.", "info")
+    return redirect(url_for("index"))
+
+# FUNCIONALIDAD F12 (BRUNO)
+@app.route("/eliminar/<int:id>", methods=["POST"])
+def eliminar_producto(id):
+    with get_db() as conn:
+        conn.execute("UPDATE productos SET activo = 0 WHERE id = ?", (id,))
+        conn.commit()
+    flash("Artículo discontinuado eliminado del catálogo activo.", "secondary")
+    return redirect(url_for("index"))
+
+# FUNCIONALIDAD F11 (IGNACIO)
+@app.route("/historial")
+def historial():
+    with get_db() as conn:
+        movimientos = conn.execute("""
+            SELECT m.id, p.nombre AS producto_nombre, p.categoria, m.tipo, m.motivo, m.cantidad, m.fecha
+            FROM movimientos m
+            JOIN productos p ON m.producto_id = p.id
+            ORDER BY m.fecha DESC, m.id DESC
+        """).fetchall()
+    return render_template("historial.html", movimientos=movimientos)
 
 if __name__ == "__main__":
     init_db()

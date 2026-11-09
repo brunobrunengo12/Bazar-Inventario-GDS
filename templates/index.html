@@ -2,14 +2,33 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Control de Stock - Bazar (Etapa 1)</title>
+    <title>Control de Stock - Bazar (Versión Final - Etapa 2)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
 <div class="container py-4">
-    <h2 class="mb-4 text-primary">Sistema de Gestión de Inventario - Bazar</h2>
+    
+    <!-- Encabezado y acceso al Historial -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-primary mb-0">Sistema de Gestión de Inventario - Bazar</h2>
+        <a href="{{ url_for('historial') }}" class="btn btn-outline-dark fw-bold">
+            Ver Historial de Movimientos y Bajas (F11)
+        </a>
+    </div>
 
-    <!-- F01: Formulario de Alta de Artículo (BB) -->
+    <!-- Mensajes de Validación y Confirmaciones -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Formulario de Alta de Artículo (BRUNO) -->
     <div class="card mb-4 shadow-sm">
         <div class="card-header bg-dark text-white">Registrar Nuevo Artículo en Catálogo (F01)</div>
         <div class="card-body">
@@ -37,11 +56,11 @@
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Stock Inicial</label>
-                    <input type="number" name="stock_actual" class="form-control" value="0" required>
+                    <input type="number" name="stock_actual" class="form-control" value="0" min="0" required>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Stock Mínimo</label>
-                    <input type="number" name="stock_minimo" class="form-control" value="5" required>
+                    <input type="number" name="stock_minimo" class="form-control" value="5" min="0" required>
                 </div>
                 <div class="col-12 text-end">
                     <button type="submit" class="btn btn-primary">Guardar Artículo</button>
@@ -50,11 +69,37 @@
         </div>
     </div>
 
-    <!-- F02: Listado General de Existencias (MD) -->
+    <!-- Búsqueda rápida (GONZALO) y Filtro por categoría (MAURO) -->
+    <div class="card mb-3 shadow-sm">
+        <div class="card-body py-2">
+            <form method="GET" action="{{ url_for('index') }}" class="row g-2 align-items-center">
+                <div class="col-md-5">
+                    <input type="text" name="q" class="form-control" placeholder="Buscar artículo por nombre en mostrador (F07)..." value="{{ busqueda }}">
+                </div>
+                <div class="col-md-4">
+                    <select name="categoria" class="form-select">
+                        <option value="">-- Todas las categorías (F10) --</option>
+                        {% for cat in ['Vidrio', 'Plástico', 'Cerámica', 'Cocina', 'Regalería'] %}
+                            <option value="{{ cat }}" {% if categoria_filtro == cat %}selected{% endif %}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-secondary w-100">Filtrar / Buscar</button>
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">Limpiar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Listado general con alertas de stock crítico -->
     <div class="card shadow-sm">
-        <div class="card-header bg-secondary text-white">Existencias Actuales en Inventario (F02)</div>
+        <div class="card-header bg-secondary text-white d-flex justify-content-between">
+            <span>Existencias Actuales en Inventario (F02)</span>
+            <span class="badge bg-danger">Fila resaltada = Alerta de Stock Crítico (F09)</span>
+        </div>
         <div class="card-body p-0">
-            <table class="table table-striped table-hover mb-0 align-middle">
+            <table class="table table-hover mb-0 align-middle">
                 <thead class="table-light">
                     <tr>
                         <th>ID</th>
@@ -65,50 +110,93 @@
                         <th>Mínimo</th>
                         <th>Ingreso (F03)</th>
                         <th>Venta (F04)</th>
-                        <th>Baja por Rotura / Falla (F06)</th>
+                        <th>Baja Rotura/Falla (F06)</th>
+                        <th>Gestión (F08 / F12)</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for p in productos %}
-                    <tr>
+                    <!-- Resaltado condicional si stock_actual <= stock_minimo -->
+                    <tr class="{% if p.stock_actual <= p.stock_minimo %}table-danger{% endif %}">
                         <td>{{ p.id }}</td>
-                        <td class="fw-bold">{{ p.nombre }}</td>
+                        <td>
+                            <span class="fw-bold">{{ p.nombre }}</span>
+                            {% if p.stock_actual <= p.stock_minimo %}
+                                <span class="badge bg-danger ms-1">REPONER</span>
+                            {% endif %}
+                        </td>
                         <td>{{ p.categoria }}</td>
                         <td>{{ p.ubicacion }}</td>
                         <td class="fs-5 fw-bold">{{ p.stock_actual }}</td>
                         <td>{{ p.stock_minimo }}</td>
                         
-                        <!-- F03: Re-stock (GB) -->
+                        <!-- Re-stock -->
                         <td>
                             <form action="{{ url_for('re_stock', id=p.id) }}" method="POST" class="d-flex gap-1">
-                                <input type="number" name="cantidad" class="form-control form-control-sm" style="width: 70px;" placeholder="Cant." required>
+                                <input type="number" name="cantidad" class="form-control form-control-sm" style="width: 65px;" min="1" placeholder="Cant." required>
                                 <button type="submit" class="btn btn-success btn-sm">+ Stock</button>
                             </form>
                         </td>
 
-                        <!-- F04: Salida por Venta (GB) -->
+                        <!-- Salida por venta -->
                         <td>
                             <form action="{{ url_for('registrar_venta', id=p.id) }}" method="POST" class="d-flex gap-1">
-                                <input type="number" name="cantidad" class="form-control form-control-sm" style="width: 70px;" placeholder="Cant." required>
+                                <input type="number" name="cantidad" class="form-control form-control-sm" style="width: 65px;" min="1" placeholder="Cant." required>
                                 <button type="submit" class="btn btn-warning btn-sm">- Venta</button>
                             </form>
                         </td>
 
-                        <!-- F06: Baja por Rotura o Falla (IR) -->
+                        <!-- Baja por rotura o falla -->
                         <td>
                             <form action="{{ url_for('registrar_baja', id=p.id) }}" method="POST" class="d-flex gap-1">
-                                <input type="number" name="cantidad" class="form-control form-control-sm" style="width: 65px;" placeholder="Cant." required>
-                                <select name="motivo" class="form-select form-select-sm" style="width: 135px;">
+                                <input type="number" name="cantidad" class="form-control form-control-sm" style="width: 60px;" min="1" placeholder="Cant." required>
+                                <select name="motivo" class="form-select form-select-sm" style="width: 125px;">
                                     <option value="Rotura en local">Rotura local</option>
                                     <option value="Falla de fábrica">Falla fábrica</option>
                                 </select>
                                 <button type="submit" class="btn btn-danger btn-sm">Baja</button>
                             </form>
                         </td>
+
+                        <!-- Modificar y Eliminar -->
+                        <td>
+                            <div class="d-flex gap-1 align-items-center">
+                                <details>
+                                    <summary class="btn btn-outline-primary btn-sm">Editar</summary>
+                                    <form action="{{ url_for('editar_producto', id=p.id) }}" method="POST" class="p-2 bg-white border rounded mt-1 shadow-sm" style="min-width: 220px;">
+                                        <div class="mb-1">
+                                            <input type="text" name="nombre" value="{{ p.nombre }}" class="form-control form-control-sm" required>
+                                        </div>
+                                        <div class="mb-1">
+                                            <select name="categoria" class="form-select form-select-sm">
+                                                {% for cat in ['Vidrio', 'Plástico', 'Cerámica', 'Cocina', 'Regalería'] %}
+                                                    <option value="{{ cat }}" {% if p.categoria == cat %}selected{% endif %}>{{ cat }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="mb-1">
+                                            <select name="ubicacion" class="form-select form-select-sm">
+                                                <option value="Mostrador" {% if p.ubicacion == 'Mostrador' %}selected{% endif %}>Mostrador</option>
+                                                <option value="Depósito" {% if p.ubicacion == 'Depósito' %}selected{% endif %}>Depósito</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="small text-muted">Stock Mínimo:</label>
+                                            <input type="number" name="stock_minimo" value="{{ p.stock_minimo }}" min="0" class="form-control form-control-sm" required>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary btn-sm w-100">Guardar Cambios</button>
+                                    </form>
+                                </details>
+
+                                <form action="{{ url_for('eliminar_producto', id=p.id) }}" method="POST" onsubmit="return confirm('¿Dar de baja definitiva este artículo discontinuado?');">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">X</button>
+                                </form>
+                            </div>
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="9" class="text-center py-3 text-muted">No hay artículos cargados en el inventario.</td>
+                        <td colspan="10" class="text-center py-3 text-muted">No se encontraron artículos con esos criterios.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -116,5 +204,6 @@
         </div>
     </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
