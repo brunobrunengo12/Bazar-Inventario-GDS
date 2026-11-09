@@ -79,11 +79,11 @@ def agregar_producto():
         stock_actual = int(request.form.get("stock_actual", 0))
         stock_minimo = int(request.form.get("stock_minimo", 0))
     except ValueError:
-        flash("Error (F05): Las cantidades de stock deben ser números enteros válidos.", "danger")
+        flash("Error: Las cantidades de stock deben ser números enteros válidos.", "danger")
         return redirect(url_for("index"))
 
     if not nombre or stock_actual < 0 or stock_minimo < 0:
-        flash("Error (F05): El nombre es obligatorio y no se permite ingresar stock inicial ni mínimo negativo.", "danger")
+        flash("Error: El nombre es obligatorio y no se permite ingresar stock inicial ni mínimo negativo.", "danger")
         return redirect(url_for("index"))
 
     with get_db() as conn:
@@ -113,7 +113,7 @@ def re_stock(id):
         cantidad = 0
 
     if cantidad <= 0:
-        flash("Error (F05): La cantidad a ingresar por re-stock debe ser mayor a cero.", "danger")
+        flash("Error: La cantidad a ingresar por re-stock debe ser mayor a cero.", "danger")
         return redirect(url_for("index"))
 
     with get_db() as conn:
@@ -139,13 +139,13 @@ def registrar_venta(id):
         cantidad = 0
 
     if cantidad <= 0:
-        flash("Error (F05): La cantidad de salida por venta debe ser mayor a cero.", "danger")
+        flash("Error: La cantidad de salida por venta debe ser mayor a cero.", "danger")
         return redirect(url_for("index"))
 
     with get_db() as conn:
         producto = conn.execute("SELECT nombre, stock_actual FROM productos WHERE id = ?", (id,)).fetchone()
         if not producto or producto["stock_actual"] < cantidad:
-            flash(f"Error (F05): Stock insuficiente para '{producto['nombre']}'. Disponible: {producto['stock_actual']} u.", "danger")
+            flash(f"Error: Stock insuficiente para '{producto['nombre']}'. Disponible: {producto['stock_actual']} u.", "danger")
             return redirect(url_for("index"))
 
         conn.execute(
@@ -172,13 +172,13 @@ def registrar_baja(id):
     motivo = request.form.get("motivo", "Rotura en local")
 
     if cantidad <= 0:
-        flash("Error (F05): La cantidad a dar de baja debe ser mayor a cero.", "danger")
+        flash("Error: La cantidad a dar de baja debe ser mayor a cero.", "danger")
         return redirect(url_for("index"))
 
     with get_db() as conn:
         producto = conn.execute("SELECT nombre, stock_actual FROM productos WHERE id = ?", (id,)).fetchone()
         if not producto or producto["stock_actual"] < cantidad:
-            flash(f"Error (F05): No se puede dar de baja más unidades de las existentes ({producto['stock_actual']} u.).", "danger")
+            flash(f"Error: No se puede dar de baja más unidades de las existentes ({producto['stock_actual']} u.).", "danger")
             return redirect(url_for("index"))
 
         conn.execute(
@@ -207,7 +207,7 @@ def editar_producto(id):
         stock_minimo = -1
 
     if not nombre or stock_minimo < 0:
-        flash("Error (F05/F08): Datos de edición inválidos o stock mínimo negativo.", "danger")
+        flash("Error: Datos de edición inválidos o stock mínimo negativo.", "danger")
         return redirect(url_for("index"))
 
     with get_db() as conn:

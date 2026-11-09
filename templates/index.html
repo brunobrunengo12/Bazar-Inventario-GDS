@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Control de Stock - Bazar (Versión Final - Etapa 2)</title>
+    <title>Control de Stock - Bazar</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
@@ -12,7 +12,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="text-primary mb-0">Sistema de Gestión de Inventario - Bazar</h2>
         <a href="{{ url_for('historial') }}" class="btn btn-outline-dark fw-bold">
-            Ver Historial de Movimientos y Bajas (F11)
+            Ver Historial de Movimientos y Bajas
         </a>
     </div>
 
@@ -30,7 +30,7 @@
 
     <!-- Formulario de Alta de Artículo (BRUNO) -->
     <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-dark text-white">Registrar Nuevo Artículo en Catálogo (F01)</div>
+        <div class="card-header bg-dark text-white">Registrar Nuevo Artículo en Catálogo</div>
         <div class="card-body">
             <form action="{{ url_for('agregar_producto') }}" method="POST" class="row g-3">
                 <div class="col-md-3">
@@ -74,11 +74,11 @@
         <div class="card-body py-2">
             <form method="GET" action="{{ url_for('index') }}" class="row g-2 align-items-center">
                 <div class="col-md-5">
-                    <input type="text" name="q" class="form-control" placeholder="Buscar artículo por nombre en mostrador (F07)..." value="{{ busqueda }}">
+                    <input type="text" name="q" class="form-control" placeholder="Buscar artículo por nombre en mostrador..." value="{{ busqueda }}">
                 </div>
                 <div class="col-md-4">
                     <select name="categoria" class="form-select">
-                        <option value="">-- Todas las categorías (F10) --</option>
+                        <option value="">-- Todas las categorías --</option>
                         {% for cat in ['Vidrio', 'Plástico', 'Cerámica', 'Cocina', 'Regalería'] %}
                             <option value="{{ cat }}" {% if categoria_filtro == cat %}selected{% endif %}>{{ cat }}</option>
                         {% endfor %}
@@ -95,8 +95,8 @@
     <!-- Listado general con alertas de stock crítico -->
     <div class="card shadow-sm">
         <div class="card-header bg-secondary text-white d-flex justify-content-between">
-            <span>Existencias Actuales en Inventario (F02)</span>
-            <span class="badge bg-danger">Fila resaltada = Alerta de Stock Crítico (F09)</span>
+            <span>Existencias Actuales en Inventario</span>
+            <span class="badge bg-danger">Fila resaltada = Alerta de Stock Crítico</span>
         </div>
         <div class="card-body p-0">
             <table class="table table-hover mb-0 align-middle">
@@ -108,10 +108,10 @@
                         <th>Ubicación</th>
                         <th>Stock Actual</th>
                         <th>Mínimo</th>
-                        <th>Ingreso (F03)</th>
-                        <th>Venta (F04)</th>
-                        <th>Baja Rotura/Falla (F06)</th>
-                        <th>Gestión (F08 / F12)</th>
+                        <th>Ingreso</th>
+                        <th>Venta</th>
+                        <th>Baja Rotura/Falla</th>
+                        <th>Gestión</th>
                     </tr>
                 </thead>
                 <tbody>
